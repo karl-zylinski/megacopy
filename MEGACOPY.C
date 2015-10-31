@@ -2,34 +2,29 @@
 #include <conio.h>
 #include <dir.h>
 #include <sys/stat.h>
+#define MAX_PATH_LEN 128
 
-void create_folders(char* path)
-{
-	char buf[128];
+static void create_folders(char* path) {
+	char buf[MAX_PATH_LEN];
 	int i = 3;
 	char c;
-	printf(path);
-	while(1)
-	{
+	printf("Ensuring folder %s exists.\n", path);
+	while(1) {
 		c = path[i];
-		if(c == '\\' || c == '\0')
-		{
+		if(c == '\\' || c == '\0') {
 			memcpy(buf, path, i);
 			buf[i] = '\0';
-			printf("Ensuring folder %s exists.\n", buf);
 			mkdir(buf);
 		}
-		if(c == '\0')
-		{
+		if(c == '\0') {
 			break;
 		}
 		++i;
 	}
 }
 
-int copy_file(char* folder, char* source, char* dest)
-{
-	char command[256];
+static int copy_file(char* folder, char* source, char* dest) {
+	char command[6 + MAX_PATH_LEN * 2];
 	struct stat source_stat;
 	struct stat dest_stat;
 	create_folders(folder);
@@ -41,8 +36,7 @@ int copy_file(char* folder, char* source, char* dest)
 	system(command);
 	stat(source, &source_stat);
 	stat(dest, &dest_stat);
-	if(dest_stat.st_size != source_stat.st_size)
-	{
+	if(dest_stat.st_size != source_stat.st_size) {
 		strcpy(command, "del ");
 		strcat(command, dest);
 		system(command);
@@ -51,50 +45,53 @@ int copy_file(char* folder, char* source, char* dest)
 	return 0;
 }
 
-void copy_files(char* path)
-{
+static int is_dir(char* path) {
+	int lax;
+	struct stat dir_stat;
+	stat(path, &dir_stat);
+	return (dir_stat.st_mode & S_IFDIR) != 0;
+}
+
+static void copy_files(char* source_root, char* dest_root, char* subpath) {
 	int done;
 	char retry_response;
-	char searchpath[128];
-	char subpath[128];
-	char destpath[128];
-	char destfolder[128];
+	char searchpath[MAX_PATH_LEN];
+	char curpath[MAX_PATH_LEN];
+	char curfolder[MAX_PATH_LEN];
+	char destpath[MAX_PATH_LEN];
+	char destfolder[MAX_PATH_LEN];
 	struct ffblk a;
-	strcpy(searchpath, path);
+	strcpy(searchpath, source_root);
+	strcat(searchpath, subpath);
 	strcat(searchpath, "\\*.*");
 	done = findfirst(searchpath, &a, DRIVE);
-
-	while(!done)
-	{
-		if(strcmp(a.ff_name, "..") == 0 || strcmp(a.ff_name, ".") == 0)
-		{
+	while(!done) {
+		if(strcmp(a.ff_name, "..") == 0 || strcmp(a.ff_name, ".") == 0) {
 			done = findnext(&a);
 			continue;
 		}
-
-		strcpy(subpath, path);
-		strcat(subpath, "\\");
-		strcat(subpath, a.ff_name);
-		if(chdir(subpath) == 0)
-		{
-			copy_files(subpath);
-		}
-		else
-		{
-			strcpy(destpath, subpath);
-			destpath[0] = 'a';
-			strcpy(destfolder, path);
-			destfolder[0] = 'a';
-			while(copy_file(destfolder, subpath, destpath) != 0)
-			{
-				printf("Failed copy of %s. Press s to skip, q to quit. Any other key retries.", subpath);
+		strcpy(curpath, source_root);
+		strcat(curpath, subpath);
+		strcat(curpath, "\\");
+		strcat(curpath, a.ff_name);
+		if(is_dir(curpath)) {
+			strcpy(curfolder, subpath);
+			strcat(curfolder, "\\");
+			strcat(curfolder, a.ff_name);
+			copy_files(source_root, dest_root, curfolder);
+		} else {
+			strcpy(destfolder, dest_root);
+			strcat(destfolder, subpath);
+			strcpy(destpath, destfolder);
+			strcat(destpath, "\\");
+			strcat(destpath, a.ff_name);
+			while(copy_file(destfolder, curpath, destpath) != 0) {
+				printf("Failed copy of %s. Press s to skip, q to quit. Any other key retries.\n", curpath);
 				retry_response = getch();
-				if(retry_response == 's')
-				{
+				if(retry_response == 's') {
 					break;
 				}
-				if(retry_response == 'q')
-				{
+				if(retry_response == 'q') {
 					return;
 				}
 			}
@@ -103,9 +100,59 @@ void copy_files(char* path)
 	}
 }
 
-int main()
-{
-	copy_files("c:");
-	printf("Done.\n");
+static char* usage_string = "Usage: megacopy.exe source_path destination_path.\n";
+
+static char* strip_trailing_slash(char* path) {
+	int len = strlen(path);
+	if (path[len - 1] == '\\') {
+		path[len - 1] = '\0';
+	}
+	return path;
+}
+
+static int str_begins_with(char* str, char* cmp) {
+	int i;
+	int slen = strlen(str);
+	int cmplen = strlen(cmp);
+	if (cmplen > slen) {
+		return 0;
+	}
+	for (i = 0; i < cmplen; ++i) {
+		if (cmp[i] != str[i]) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int main (int argc, char *argv[]) {
+	char source_dir[MAX_PATH_LEN];
+	char dest_dir[MAX_PATH_LEN];
+	if (argc != 3) {
+		printf("Too few arguments.\n");
+		printf(usage_string);
+		return 1;
+	}
+	if (!is_dir(argv[1])) {
+		printf("Source path does not exist or is not a directory.\n");
+		printf(usage_string);
+		return 1;
+	}
+	if (!is_dir(argv[2])) {
+		printf("Destination path does not exist or is not a directory.\n");
+		printf(usage_string);
+		return 1;
+	}
+	strcpy(source_dir, argv[1]);
+	strip_trailing_slash(source_dir);
+	strcpy(dest_dir, argv[2]);
+	strip_trailing_slash(dest_dir);
+	if (str_begins_with(dest_dir, source_dir)) {
+		printf("Destination directory is inside source directory. This is not allowed since it could lead to undefined behavior.\n");
+		printf(usage_string);
+		return 1;
+	}
+	copy_files(source_dir, dest_dir, "");
+	printf("\nDone.\n");
 	return 0;
-}
+}
