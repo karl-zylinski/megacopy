@@ -58,7 +58,6 @@ static int copy_file(char* folder, char* source, char* dest) {
 }
 
 static int is_dir(char* path) {
-	int lax;
 	struct stat dir_stat;
 	stat(path, &dir_stat);
 	return (dir_stat.st_mode & S_IFDIR) != 0;
@@ -72,31 +71,31 @@ static void copy_files(char* source_root, char* dest_root, char* subpath) {
 	char curfolder[MAX_PATH_LEN];
 	char destpath[MAX_PATH_LEN];
 	char destfolder[MAX_PATH_LEN];
-	struct ffblk a;
+	struct ffblk file;
 	strcpy(searchpath, source_root);
 	strcat(searchpath, subpath);
 	strcat(searchpath, "\\*.*");
-	done = findfirst(searchpath, &a, DRIVE);
+	done = findfirst(searchpath, &file, DRIVE);
 	while(!done) {
-		if(strcmp(a.ff_name, "..") == 0 || strcmp(a.ff_name, ".") == 0) {
-			done = findnext(&a);
+		if(strcmp(file.ff_name, "..") == 0 || strcmp(file.ff_name, ".") == 0) {
+			done = findnext(&file);
 			continue;
 		}
 		strcpy(curpath, source_root);
 		strcat(curpath, subpath);
 		strcat(curpath, "\\");
-		strcat(curpath, a.ff_name);
+		strcat(curpath, file.ff_name);
 		if(is_dir(curpath)) {
 			strcpy(curfolder, subpath);
 			strcat(curfolder, "\\");
-			strcat(curfolder, a.ff_name);
+			strcat(curfolder, file.ff_name);
 			copy_files(source_root, dest_root, curfolder);
 		} else {
 			strcpy(destfolder, dest_root);
 			strcat(destfolder, subpath);
 			strcpy(destpath, destfolder);
 			strcat(destpath, "\\");
-			strcat(destpath, a.ff_name);
+			strcat(destpath, file.ff_name);
 			while(copy_file(destfolder, curpath, destpath) != 0) {
 				printf("Failed copy of %s. Press s to skip, q to quit. Any other key retries.\n", curpath);
 				retry_response = getch();
@@ -108,7 +107,7 @@ static void copy_files(char* source_root, char* dest_root, char* subpath) {
 				}
 			}
 		}
-		done = findnext(&a);
+		done = findnext(&file);
 	}
 }
 
@@ -168,3 +167,4 @@ int main (int argc, char *argv[]) {
 	printf("\nDone.\n");
 	return 0;
 }
+
