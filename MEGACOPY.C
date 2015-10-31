@@ -1,3 +1,15 @@
+/*
+	This application is for DOS. It copies files to from one place to another and lets
+	you retry / skip / quit if the operation fails. It's very handy for copying a
+	directory tree off a harddrive onto several floppys.
+
+	Written by Karl Zylinski
+	karl@zylinski.se
+	http://zylinski.se
+
+	This code is public domain.
+*/
+
 #include <stdio.h>
 #include <conio.h>
 #include <dir.h>
@@ -100,7 +112,7 @@ static void copy_files(char* source_root, char* dest_root, char* subpath) {
 	}
 }
 
-static char* usage_string = "Usage: megacopy.exe source_path destination_path.\n";
+static char* usage_string = "Usage: megacopy.exe absolute_source_path absolute_destination_path.\n";
 
 static char* strip_trailing_slash(char* path) {
 	int len = strlen(path);
